@@ -38,21 +38,26 @@ public class MyServer {
     }
 
     public synchronized boolean isNickBusy(String nick) {
-//        return clients.stream().anyMatch(client -> client.getName().equals(nick));
-        for (ClientHandler client : clients) {
-            if (client.getNick().equals(nick)) {
-                return true;
-            }
-        }
-        return false;
+        return clients.stream().anyMatch(client -> client.getNick().equals(nick));
     }
 
     public synchronized void subscribe(ClientHandler clientHandler) {
         clients.add(clientHandler);
+        broadcastClients();
     }
 
     public synchronized void unsubscribe(ClientHandler clientHandler) {
         clients.remove(clientHandler);
+        broadcastClients();
+    }
+
+    /**
+     * (Дополнительно для упрощения) если лист пустой, то отправим всем. Непустой - отфильтруем
+     */
+    public synchronized void broadcastMessage(String message, List<String> nicknames) {
+        clients.stream()
+                .filter(client -> !message.isEmpty() && (nicknames.isEmpty() || nicknames.contains(client.getNick())))
+                .forEach(client -> client.sendMsg(message));
     }
 
     /**
@@ -60,45 +65,69 @@ public class MyServer {
      */
     public synchronized void broadcastMessage(String message, String fromNick) {
         String[] partsMsg = message.split("\\s+");
+        List<String> nicknames = new ArrayList<>();
+        String prefix = "[" + fromNick + "]: ";
 
-        // если личное сообщение кому-то
         // если первое слово /direct
         if (partsMsg[0].equalsIgnoreCase(ChatConstants.DIRECT)) {
-            // если в сообщении больше двух слов и верно указан nickname получателя
-            if (partsMsg.length > 2 && isNickBusy(partsMsg[1].toLowerCase())) {
 
-                // собрать сообщение без /direct и nickname получателя
-                message = "direct: [" + fromNick + "]: " +
-                        Arrays.stream(partsMsg).skip(2).collect(Collectors.joining(" "));
+            // получатель и отправитель
+            nicknames.addAll(List.of(partsMsg[1], fromNick));
 
-                getClientByNick(partsMsg[1]).sendMsg(message);  // сообщение получателю
-                getClientByNick(fromNick).sendMsg(message);     // сообщение отправителю
+            message = "direct: " + prefix + Arrays.stream(partsMsg)
+                    .skip(2)
+                    .collect(Collectors.joining(" "));
 
-            } else {
-                getClientByNick(fromNick).sendMsg("Error in sending a private message: " + message);
-            }
+            // если первое слово /list
+        } else if (partsMsg[0].equalsIgnoreCase(ChatConstants.SEND_TO_LIST)) {
+
+            // список получателей
+            nicknames = Arrays.stream(partsMsg)
+                    .skip(1)
+                    .takeWhile(e -> !e.equalsIgnoreCase(ChatConstants.SEND_TO_LIST)) // взять все, что между /list.../list
+                    .distinct()
+                    .collect(Collectors.toList());
+            // ... и отправитель
+            nicknames.add(fromNick);
+
+            message = "direct: " + prefix + Arrays.stream(partsMsg)
+                    .skip(1)
+                    .dropWhile(e -> !e.equalsIgnoreCase(ChatConstants.SEND_TO_LIST))
+                    .skip(1)
+                    .collect(Collectors.joining(" "));
         } else {
-            // иначе отправляем сообщение всем
-            broadcastMessage("[" + fromNick + "]: " + message);
+            // сообщение всем
+            message = prefix + message;
         }
+
+        broadcastMessage(message, nicknames);
     }
 
     /**
      * Общие информационные сообщения, либо отправка всем
      */
     public synchronized void broadcastMessage(String message) {
-        clients.forEach(clientHandler -> clientHandler.sendMsg(message));
+        broadcastMessage(message, List.of());
     }
 
     /**
-     * Получить клиента по nickname
+     * Список пользователей в сети. Всем
      */
-    private ClientHandler getClientByNick(String nick) {
-        return clients.stream()
-                .filter(clientHandler -> clientHandler.getNick().equals(nick))
-                .findFirst()
-                .get();
+    public synchronized void broadcastClients() {
+        broadcastClients(List.of());
     }
 
+    /**
+     * Список пользователей в сети. Тому, кто попросил вывести список
+     */
+    public synchronized void broadcastClients(List<String> list) {
+        String clientsMessage = ChatConstants.CLIENTS_LIST +
+                " " +
+                clients.stream()
+                        .map(ClientHandler::getNick)
+                        .collect(Collectors.joining(" "));
+
+        broadcastMessage(clientsMessage, list);
+    }
 
 }
