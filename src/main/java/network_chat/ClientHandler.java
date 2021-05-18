@@ -12,13 +12,15 @@ import java.util.Optional;
  */
 public class ClientHandler {
 
-    private final Integer timeForAuth = 60 * 1000;
     private MyServer server;
     private Socket socket;
     private DataInputStream in;
     private DataOutputStream out;
+
     private String nick;
+
     private volatile boolean timeIsOut = true;
+    private final Integer timeForAuth = 60 * 1000;
 
     public ClientHandler(MyServer server, Socket socket) {
         try {
