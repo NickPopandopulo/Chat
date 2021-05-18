@@ -19,8 +19,8 @@ public class ClientHandler {
 
     private String nick;
 
-    private volatile boolean timeIsOut = true;
     private final Integer timeForAuth = 60 * 1000;
+    private volatile boolean timeIsOut = true;
 
     public ClientHandler(MyServer server, Socket socket) {
         try {

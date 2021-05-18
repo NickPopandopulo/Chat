@@ -10,8 +10,8 @@ import java.util.stream.Collectors;
 
 public class MyServer {
 
-    private List<ClientHandler> clients;
     private AuthService authService;
+    private List<ClientHandler> clients;
 
     public MyServer() {
         try (ServerSocket server = new ServerSocket(ChatConstants.PORT)) {
