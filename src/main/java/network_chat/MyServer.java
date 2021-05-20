@@ -61,6 +61,13 @@ public class MyServer {
     }
 
     /**
+     * Общие информационные сообщения, либо отправка всем
+     */
+    public synchronized void broadcastMessage(String message) {
+        broadcastMessage(message, List.of());
+    }
+
+    /**
      * Личные сообщения, либо всем
      */
     public synchronized void broadcastMessage(String message, String fromNick) {
@@ -101,13 +108,6 @@ public class MyServer {
         }
 
         broadcastMessage(message, nicknames);
-    }
-
-    /**
-     * Общие информационные сообщения, либо отправка всем
-     */
-    public synchronized void broadcastMessage(String message) {
-        broadcastMessage(message, List.of());
     }
 
     /**

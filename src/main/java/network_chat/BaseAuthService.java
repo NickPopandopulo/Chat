@@ -12,9 +12,9 @@ public class BaseAuthService implements AuthService {
 
     public BaseAuthService() {
         entries = List.of(
-                new Entry("nick1", "login1", "pass1"),
-                new Entry("nick2", "login2", "pass2"),
-                new Entry("nick3", "login3", "pass3")
+                new Entry("nick1", "l1", "p1"),
+                new Entry("nick2", "l2", "p2"),
+                new Entry("nick3", "l3", "p3")
         );
     }
 

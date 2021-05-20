@@ -3,5 +3,7 @@ module org.example {
     requires javafx.fxml;
 
     opens chat to javafx.fxml;
+    opens network_chat to javafx.fxml;
     exports chat;
+    exports network_chat;
 }

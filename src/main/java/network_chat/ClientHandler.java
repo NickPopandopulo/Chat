@@ -12,13 +12,15 @@ import java.util.Optional;
  */
 public class ClientHandler {
 
-    private final Integer timeForAuth = 60 * 1000;
     private MyServer server;
     private Socket socket;
     private DataInputStream in;
     private DataOutputStream out;
+
     private String nick;
+
     private volatile boolean timeIsOut = true;
+    private final Integer timeForAuth = 60 * 1000;
 
     public ClientHandler(MyServer server, Socket socket) {
         try {
@@ -73,20 +75,6 @@ public class ClientHandler {
         }
     }
 
-    private void timeForAuth() {
-        new Thread(() -> {
-            try {
-                Thread.sleep(timeForAuth);
-                if (timeIsOut) {
-                    System.out.println(socket.getInetAddress() + " time is out.");
-                    socket.close();
-                }
-            } catch (InterruptedException | IOException e) {
-                e.printStackTrace();
-            }
-        }).start();
-    }
-
     public void sendMsg(String message) {
         try {
             out.writeUTF(message);
@@ -127,6 +115,20 @@ public class ClientHandler {
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    private void timeForAuth() {
+        new Thread(() -> {
+            try {
+                Thread.sleep(timeForAuth);
+                if (timeIsOut) {
+                    System.out.println(socket.getInetAddress() + " time is out.");
+                    socket.close();
+                }
+            } catch (InterruptedException | IOException e) {
+                e.printStackTrace();
+            }
+        }).start();
     }
 }
 
