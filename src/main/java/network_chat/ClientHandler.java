@@ -12,15 +12,14 @@ import java.util.Optional;
  */
 public class ClientHandler {
 
+    private final Integer timeForAuth = 60 * 1000;
     private MyServer server;
     private Socket socket;
     private DataInputStream in;
     private DataOutputStream out;
-
     private String nick;
-
+    private int id;
     private volatile boolean timeIsOut = true;
-    private final Integer timeForAuth = 60 * 1000;
 
     public ClientHandler(MyServer server, Socket socket) {
         try {
@@ -54,14 +53,19 @@ public class ClientHandler {
         while (true) {
             timeForAuth();
             String message = in.readUTF();
+
             if (message.startsWith(ChatConstants.AUTH_COMMAND) &&
                     (parts = message.split("\\s+")).length > 2) {
+
                 Optional<String> nick = server.getAuthService().getNickByLoginAndPass(parts[1], parts[2]);
+                Optional<String> id = server.getAuthService().getIDByLoginAndPass(parts[1], parts[2]);
+
                 if (nick.isPresent()) {
                     if (!server.isNickBusy(nick.get())) {
                         timeIsOut = false;
                         sendMsg(ChatConstants.AUTH_SUCCESS + " " + nick.get());
                         this.nick = nick.get();
+                        this.id = Integer.parseInt(id.get());
                         server.subscribe(this);
                         server.broadcastMessage(this.nick + " joined the chat.");
                         return;
@@ -91,6 +95,18 @@ public class ClientHandler {
                 return;
             } else if (messageFromClient.startsWith(ChatConstants.CLIENTS_LIST)) {
                 server.broadcastClients(List.of(nick));
+            } else if (messageFromClient.startsWith(ChatConstants.CHANGE_NICK)) { // смена nickname
+                String[] partsMsg = messageFromClient.split("\\s+");
+                // Если nick не занят
+                if (!server.isNickBusy(partsMsg[1])) {
+                    server.getAuthService().changeNick(id, partsMsg[1]);
+                    server.broadcastMessage("User " + nick + " has changed nickname to " + partsMsg[1]);
+                    nick = partsMsg[1];
+                // Если nick занят
+                } else if (server.isNickBusy(partsMsg[1])) {
+                    sendMsg(ChatConstants.DIRECT + " " + nick +
+                            " Nickname " + partsMsg[1] + " is already in use.");
+                }
             } else {
                 server.broadcastMessage(messageFromClient, nick);
             }
