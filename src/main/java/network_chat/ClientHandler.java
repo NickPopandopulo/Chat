@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.net.Socket;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ExecutorService;
 
 /**
  * Serves the client (responsible for communication between the client and the server)
@@ -22,14 +23,15 @@ public class ClientHandler {
     private volatile boolean timeIsOut = true;
     private final Integer timeForAuth = 60 * 1000;
 
-    public ClientHandler(MyServer server, Socket socket) {
+    public ClientHandler(MyServer server, Socket socket, ExecutorService executorService) {
         try {
             this.nick = "";
             this.server = server;
             this.socket = socket;
             this.in = new DataInputStream(socket.getInputStream());
             this.out = new DataOutputStream(socket.getOutputStream());
-            new Thread(() -> {
+
+            executorService.execute(() -> {
                 try {
                     authentication();
                     readMessages();
@@ -38,8 +40,8 @@ public class ClientHandler {
                 } finally {
                     closeConnection();
                 }
+            });
 
-            }).start();
         } catch (IOException ex) {
             System.out.println("Problem when creating a client.");
         }
@@ -60,8 +62,8 @@ public class ClientHandler {
                 if (nick.isPresent()) {
                     if (!server.isNickBusy(nick.get())) {
                         timeIsOut = false;
-                        sendMsg(ChatConstants.AUTH_SUCCESS + " " + nick.get());
                         this.nick = nick.get();
+                        sendMsg(ChatConstants.AUTH_SUCCESS + " " + this.nick);
                         server.subscribe(this);
                         server.broadcastMessage(this.nick + " joined the chat.");
                         return;
@@ -88,6 +90,7 @@ public class ClientHandler {
             String messageFromClient = in.readUTF();
             System.out.println("[" + nick + "]: " + messageFromClient);
             if (messageFromClient.equals(ChatConstants.STOP_WORD)) {
+                out.writeUTF(ChatConstants.STOP_WORD);
                 return;
             } else if (messageFromClient.startsWith(ChatConstants.CLIENTS_LIST)) {
                 server.broadcastClients(List.of(nick));

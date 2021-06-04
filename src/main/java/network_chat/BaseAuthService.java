@@ -54,5 +54,9 @@ public class BaseAuthService implements AuthService {
         }
     }
 
+    public int getAmountOfUsersInBase() {
+        return entries.size();
+    }
+
 
 }
