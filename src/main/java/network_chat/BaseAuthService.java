@@ -22,8 +22,8 @@ public class BaseAuthService implements AuthService {
             connection = DriverManager.getConnection(DATABASE_URL);
             stmt = connection.createStatement();
 
-//            createTable();
-//            fillTable();
+            createTable();
+            fillTable();
 
             System.out.println("BaseAuthService started.");
         } catch (ClassNotFoundException | SQLException e) {
@@ -32,6 +32,10 @@ public class BaseAuthService implements AuthService {
     }
 
     private void createTable() throws SQLException {
+        String dropTableIfExists = "DROP TABLE IF EXISTS Users;";
+
+        stmt.execute(dropTableIfExists);
+
         String createTable = "CREATE TABLE IF NOT EXISTS Users (" +
                 "UserID INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
                 "NickName VARCHAR(30) NOT NULL, " +
@@ -59,6 +63,8 @@ public class BaseAuthService implements AuthService {
     @Override
     public void stop() {
         try {
+            stmt.execute("DROP TABLE Users;");
+            stmt.close();
             connection.close();
             System.out.println("BaseAuthService stopped.");
         } catch (SQLException throwables) {
@@ -81,16 +87,12 @@ public class BaseAuthService implements AuthService {
      */
     private Optional<String> getDataByLoginAndPass(String login, String pass, int status) {
         try {
-            String selectQuery = "SELECT * FROM USERS";
+            String selectQuery = "SELECT * FROM USERS WHERE Login = '" + login + "' AND Pass = '" + pass + "';";
             ResultSet rs = stmt.executeQuery(selectQuery);
-            while (rs.next()) {
-                if (rs.getString("Login").equals(login) && rs.getString("Password").equals(pass)) {
-                    if (status == GET_NICK) {
-                        return Optional.ofNullable(rs.getString("NickName"));
-                    } else if (status == GET_ID) {
-                        return Optional.ofNullable(rs.getString("UserID"));
-                    }
-                }
+            if (status == GET_NICK) {
+                return Optional.ofNullable(rs.getString("NickName"));
+            } else if (status == GET_ID) {
+                return Optional.ofNullable(rs.getString("UserID"));
             }
         } catch (SQLException throwables) {
             throwables.printStackTrace();
@@ -101,7 +103,7 @@ public class BaseAuthService implements AuthService {
     @Override
     public synchronized void changeNick(int id, String newNickName) {
         try {
-            String updateQuery = "UPDATE Users SET NickName='" + newNickName + "' WHERE UserID=" + id + ";";
+            String updateQuery = "UPDATE Users SET NickName = '" + newNickName + "' WHERE UserID = " + id + ";";
             stmt.executeUpdate(updateQuery);
         } catch (SQLException throwables) {
             throwables.printStackTrace();
