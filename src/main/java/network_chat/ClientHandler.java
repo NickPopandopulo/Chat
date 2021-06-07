@@ -17,10 +17,11 @@ public class ClientHandler {
     private Socket socket;
     private DataInputStream in;
     private DataOutputStream out;
+    private ExecutorService executorService;
 
     private String nick;
 
-    private volatile boolean timeIsOut = true;
+    private volatile boolean isAuthorized = false;
     private final Integer timeForAuth = 60 * 1000;
 
     public ClientHandler(MyServer server, Socket socket, ExecutorService executorService) {
@@ -30,6 +31,7 @@ public class ClientHandler {
             this.socket = socket;
             this.in = new DataInputStream(socket.getInputStream());
             this.out = new DataOutputStream(socket.getOutputStream());
+            this.executorService = executorService;
 
             executorService.execute(() -> {
                 try {
@@ -61,7 +63,7 @@ public class ClientHandler {
                 Optional<String> nick = server.getAuthService().getNickByLoginAndPass(parts[1], parts[2]);
                 if (nick.isPresent()) {
                     if (!server.isNickBusy(nick.get())) {
-                        timeIsOut = false;
+                        isAuthorized = true;
                         this.nick = nick.get();
                         sendMsg(ChatConstants.AUTH_SUCCESS + " " + this.nick);
                         server.subscribe(this);
@@ -121,17 +123,24 @@ public class ClientHandler {
     }
 
     private void timeForAuth() {
-        new Thread(() -> {
+        executorService.execute(() -> {
             try {
-                Thread.sleep(timeForAuth);
-                if (timeIsOut) {
-                    System.out.println(socket.getInetAddress() + " time is out.");
-                    socket.close();
+                long startTime = System.currentTimeMillis();
+                while (true) {
+                    Thread.sleep(5000);
+
+                    if (isAuthorized) break;
+
+                    if ((System.currentTimeMillis() - startTime) >= timeForAuth) {
+                        System.out.println(socket.getInetAddress() + " time is out.");
+                        socket.close();
+                        break;
+                    }
                 }
             } catch (InterruptedException | IOException e) {
                 e.printStackTrace();
             }
-        }).start();
+        });
     }
 }
 
