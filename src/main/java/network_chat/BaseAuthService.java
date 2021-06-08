@@ -1,6 +1,6 @@
 package network_chat;
 
-import java.util.List;
+import java.sql.*;
 import java.util.Optional;
 
 /**
@@ -8,51 +8,106 @@ import java.util.Optional;
  */
 public class BaseAuthService implements AuthService {
 
-    private final List<Entry> entries;
+    private final static String DATABASE_URL = "jdbc:sqlite:javadb.db";
+    private static Connection connection;
+    private static Statement stmt;
 
-    public BaseAuthService() {
-        entries = List.of(
-                new Entry("nick1", "l1", "p1"),
-                new Entry("nick2", "l2", "p2"),
-                new Entry("nick3", "l3", "p3")
-        );
-    }
+    private final static int GET_ID = 0;
+    private final static int GET_NICK = 1;
 
     @Override
     public void start() {
-        System.out.println("BaseAuthService started.");
+        try {
+            Class.forName("org.sqlite.JDBC");
+            connection = DriverManager.getConnection(DATABASE_URL);
+            stmt = connection.createStatement();
+
+            createTable();
+            fillTable();
+
+            System.out.println("BaseAuthService started.");
+        } catch (ClassNotFoundException | SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void createTable() throws SQLException {
+        String dropTableIfExists = "DROP TABLE IF EXISTS Users;";
+
+        stmt.execute(dropTableIfExists);
+
+        String createTable = "CREATE TABLE IF NOT EXISTS Users (" +
+                "UserID INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                "NickName VARCHAR(30) NOT NULL, " +
+                "Login VARCHAR(30) NOT NULL, " +
+                "Password VARCHAR(30) NOT NULL " +
+                ")";
+
+        stmt.execute(createTable);
+    }
+
+    private void fillTable() throws SQLException {
+        PreparedStatement prepInsert = connection.prepareStatement("INSERT INTO Users (NickName, Login, Password) " +
+                "VALUES (?, ?, ?)");
+
+        for (int i = 1; i < 4; i++) {
+            prepInsert.setString(1, "nick" + i);
+            prepInsert.setString(2, "l" + i);
+            prepInsert.setString(3, "p" + i);
+            prepInsert.addBatch();
+        }
+
+        prepInsert.executeBatch();
     }
 
     @Override
     public void stop() {
-        System.out.println("BaseAuthService stopped.");
+        try {
+            stmt.execute("DROP TABLE Users;");
+            stmt.close();
+            connection.close();
+            System.out.println("BaseAuthService stopped.");
+        } catch (SQLException throwables) {
+            throwables.printStackTrace();
+        }
     }
 
     @Override
     public Optional<String> getNickByLoginAndPass(String login, String pass) {
-//        return entries.stream()
-//                .filter(entry -> entry.login.equals(login) && entry.pass.equals(pass))
-//                .map(entry -> entry.nick)
-//                .findFirst().orElse(null);
-        for (Entry entry : entries) {
-            if (entry.login.equals(login) && entry.pass.equals(pass)) {
-                return Optional.ofNullable(entry.nick);
+        return getDataByLoginAndPass(login, pass, GET_NICK);
+    }
+
+    @Override
+    public Optional<String> getIDByLoginAndPass(String login, String pass) {
+        return getDataByLoginAndPass(login, pass, GET_ID);
+    }
+
+    /**
+     * Вспомогательный метод, чтобы получить по логину и паролю либо nick, либо ID
+     */
+    private Optional<String> getDataByLoginAndPass(String login, String pass, int status) {
+        try {
+            String selectQuery = "SELECT * FROM USERS WHERE Login = '" + login + "' AND Pass = '" + pass + "';";
+            ResultSet rs = stmt.executeQuery(selectQuery);
+            if (status == GET_NICK) {
+                return Optional.ofNullable(rs.getString("NickName"));
+            } else if (status == GET_ID) {
+                return Optional.ofNullable(rs.getString("UserID"));
             }
+        } catch (SQLException throwables) {
+            throwables.printStackTrace();
         }
         return Optional.empty();
     }
 
-    private static class Entry {
-        private final String nick;
-        private final String login;
-        private final String pass;
-
-        public Entry(String nick, String login, String pass) {
-            this.nick = nick;
-            this.login = login;
-            this.pass = pass;
+    @Override
+    public synchronized void changeNick(int id, String newNickName) {
+        try {
+            String updateQuery = "UPDATE Users SET NickName = '" + newNickName + "' WHERE UserID = " + id + ";";
+            stmt.executeUpdate(updateQuery);
+        } catch (SQLException throwables) {
+            throwables.printStackTrace();
         }
     }
-
 
 }
