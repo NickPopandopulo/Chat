@@ -29,7 +29,8 @@ public class Client {
     private Socket socket;
     private DataInputStream in;
     private DataOutputStream out;
-    private File file = new File("history.txt");
+    private File fileHistory;
+    private BufferedWriter bwToFileHistory;
 
     @FXML
     public void initialize() throws IOException {
@@ -46,6 +47,7 @@ public class Client {
                 while (true) {
                     String strFromServer = in.readUTF();
                     if (strFromServer.startsWith(ChatConstants.AUTH_SUCCESS)) {
+                        prepareHistoryInput(strFromServer);
                         break;
                     }
                     txtAreaChat.appendText(strFromServer + "\n");
@@ -61,12 +63,17 @@ public class Client {
                         break;
                     }
                     txtAreaChat.appendText(strFromServer + "\n");
+                    bwToFileHistory.write(strFromServer + "\n");
+                    bwToFileHistory.flush();
                 }
-                saveHistory();
-                Platform.exit();
             } catch (IOException ex) {
                 ex.printStackTrace();
-                saveHistory();
+            } finally {
+                try {
+                    bwToFileHistory.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
                 Platform.exit();
             }
         });
@@ -100,17 +107,29 @@ public class Client {
     }
 
     /**
+     * Подготовка файла с историей и открытие потока для ввода в файл
+     */
+    private void prepareHistoryInput(String strFromServer) throws IOException {
+        String[] parts = strFromServer.split("\\s+");
+        fileHistory = new File("history_" + parts[1] + ".txt");
+
+        if (!fileHistory.exists()) fileHistory.createNewFile(); // проверка на существование файла с историей
+
+        bwToFileHistory = new BufferedWriter(new FileWriter(fileHistory, true));
+    }
+
+    /**
      * Сохранение истории. Добавляются в файл новые строки чата, которых не было до этого в файле
      */
     private void saveHistory() {
 
         try {
-            if (!file.exists()) file.createNewFile(); // проверка на существование файла с историей
+            if (!fileHistory.exists()) fileHistory.createNewFile(); // проверка на существование файла с историей
         } catch (IOException e) {
             e.printStackTrace();
         }
 
-        try (BufferedWriter bw = new BufferedWriter(new FileWriter(file, true))) {
+        try (BufferedWriter bw = new BufferedWriter(new FileWriter(fileHistory, true))) {
 
             /**
              * Собирается лист из текущих строк чата
@@ -148,13 +167,13 @@ public class Client {
      * Загрузка истории чата после успешной авторизации
      */
     private void loadHistory() {
-        if (!file.exists()) return;
+        if (!fileHistory.exists()) return;
 
         try {
             /**
              * Количество строк в файле с историей
              */
-            long countLines = Files.lines(file.toPath()).count();
+            long countLines = Files.lines(fileHistory.toPath()).count();
 
             /**
              * Если в файле с историей, много строк (больше HISTORY_LIMIT),
@@ -170,7 +189,7 @@ public class Client {
             /**
              * Собираем из файла с историей n = HISTORY_LIMIT последних строк
              */
-            Files.lines(file.toPath())
+            Files.lines(fileHistory.toPath())
                     .skip(countLines - HISTORY_LIMIT)
                     .forEach(str -> txtAreaChat.appendText(str + "\n"));
 
