@@ -30,4 +30,9 @@ public interface AuthService {
      * Change nickname
      */
     void changeNick(int id, String newNickName);
+
+    /**
+     * Check if nickname is busy in database
+     */
+    boolean isNickBusyInDB(String s);
 }

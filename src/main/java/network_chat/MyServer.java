@@ -7,25 +7,31 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 public class MyServer {
 
     private AuthService authService;
     private List<ClientHandler> clients;
 
+    public static final Logger LOGGER = LogManager.getLogger(MyServer.class);
+
     public MyServer() {
         try (ServerSocket server = new ServerSocket(ChatConstants.PORT)) {
             authService = new BaseAuthService();
             authService.start();
+            LOGGER.info("Server is started!");
             clients = new ArrayList<>();
             while (true) {
-                System.out.println("Wait for clients...");
+                LOGGER.info("Wait for clients...");
                 Socket socket = server.accept();
-                System.out.println(socket.getInetAddress() + " client is connected!");
+                LOGGER.info(socket.getInetAddress() + " client is connected!");
                 new ClientHandler(this, socket);
             }
         } catch (IOException e) {
             e.printStackTrace();
+            LOGGER.error(e);
         } finally {
             if (authService != null) {
                 authService.stop();
