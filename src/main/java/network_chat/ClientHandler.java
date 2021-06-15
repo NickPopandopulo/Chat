@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.net.Socket;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ExecutorService;
 
 /**
  * Serves the client (responsible for communication between the client and the server)
@@ -19,16 +20,19 @@ public class ClientHandler {
     private DataOutputStream out;
     private String nick;
     private int id;
-    private volatile boolean timeIsOut = true;
+    private volatile boolean isAuthorized = false;
+    private ExecutorService executorService;
 
-    public ClientHandler(MyServer server, Socket socket) {
+    public ClientHandler(MyServer server, Socket socket, ExecutorService executorService) {
         try {
             this.nick = "";
             this.server = server;
             this.socket = socket;
             this.in = new DataInputStream(socket.getInputStream());
             this.out = new DataOutputStream(socket.getOutputStream());
-            new Thread(() -> {
+            this.executorService = executorService;
+
+            executorService.execute(() -> {
                 try {
                     authentication();
                     readMessages();
@@ -38,7 +42,7 @@ public class ClientHandler {
                     closeConnection();
                 }
 
-            }).start();
+            });
         } catch (IOException ex) {
             System.out.println("Problem when creating a client.");
         }
@@ -62,9 +66,9 @@ public class ClientHandler {
 
                 if (nick.isPresent()) {
                     if (!server.isNickBusy(nick.get())) {
-                        timeIsOut = false;
-                        sendMsg(ChatConstants.AUTH_SUCCESS + " " + nick.get());
+                        isAuthorized = true;
                         this.nick = nick.get();
+                        sendMsg(ChatConstants.AUTH_SUCCESS + " " + this.nick);
                         this.id = Integer.parseInt(id.get());
                         server.subscribe(this);
                         server.broadcastMessage(this.nick + " joined the chat.");
@@ -92,6 +96,7 @@ public class ClientHandler {
             String messageFromClient = in.readUTF();
             System.out.println("[" + nick + "]: " + messageFromClient);
             if (messageFromClient.equals(ChatConstants.STOP_WORD)) {
+                out.writeUTF(ChatConstants.STOP_WORD);
                 return;
             } else if (messageFromClient.startsWith(ChatConstants.CLIENTS_LIST)) {
                 server.broadcastClients(List.of(nick));
@@ -102,7 +107,7 @@ public class ClientHandler {
                     server.getAuthService().changeNick(id, partsMsg[1]);
                     server.broadcastMessage("User " + nick + " has changed nickname to " + partsMsg[1]);
                     nick = partsMsg[1];
-                // Если nick занят
+                    // Если nick занят
                 } else if (server.isNickBusy(partsMsg[1])) {
                     sendMsg(ChatConstants.DIRECT + " " + nick +
                             " Nickname " + partsMsg[1] + " is already in use.");
@@ -134,17 +139,24 @@ public class ClientHandler {
     }
 
     private void timeForAuth() {
-        new Thread(() -> {
+        executorService.execute(() -> {
             try {
-                Thread.sleep(timeForAuth);
-                if (timeIsOut) {
-                    System.out.println(socket.getInetAddress() + " time is out.");
-                    socket.close();
+                long startTime = System.currentTimeMillis();
+                while (true) {
+                    Thread.sleep(5000);
+
+                    if (isAuthorized) break;
+
+                    if ((System.currentTimeMillis() - startTime) >= timeForAuth) {
+                        System.out.println(socket.getInetAddress() + " time is out.");
+                        socket.close();
+                        break;
+                    }
                 }
             } catch (InterruptedException | IOException e) {
                 e.printStackTrace();
             }
-        }).start();
+        });
     }
 }
 
