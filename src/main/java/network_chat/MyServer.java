@@ -6,6 +6,8 @@ import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
 public class MyServer {
@@ -17,12 +19,15 @@ public class MyServer {
         try (ServerSocket server = new ServerSocket(ChatConstants.PORT)) {
             authService = new BaseAuthService();
             authService.start();
+
+            ExecutorService executorService = Executors.newCachedThreadPool();
+
             clients = new ArrayList<>();
             while (true) {
                 System.out.println("Wait for clients...");
                 Socket socket = server.accept();
                 System.out.println(socket.getInetAddress() + " client is connected!");
-                new ClientHandler(this, socket);
+                new ClientHandler(this, socket, executorService);
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -43,12 +48,10 @@ public class MyServer {
 
     public synchronized void subscribe(ClientHandler clientHandler) {
         clients.add(clientHandler);
-        broadcastClients();
     }
 
     public synchronized void unsubscribe(ClientHandler clientHandler) {
         clients.remove(clientHandler);
-        broadcastClients();
     }
 
     /**
@@ -127,7 +130,7 @@ public class MyServer {
                         .map(ClientHandler::getNick)
                         .collect(Collectors.joining(" "));
 
-        broadcastMessage(clientsMessage, list);
+        broadcastMessage(clientsMessage + "\n", list);
     }
 
 }
