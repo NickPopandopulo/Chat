@@ -20,10 +20,7 @@ public class MyServer {
             authService = new BaseAuthService();
             authService.start();
 
-            // запрашивается количество доступных для авторизации пользователей из БД
-            int volumeOfBase = ((BaseAuthService) authService).getAmountOfUsersInBase();
-            // создается пул из volumeOfBase * 2 потоков т.к. для каждого клиента еще нужен поток для ожидания авторизации
-            ExecutorService executorService = Executors.newFixedThreadPool(volumeOfBase * 2);
+            ExecutorService executorService = Executors.newCachedThreadPool();
 
             clients = new ArrayList<>();
             while (true) {
