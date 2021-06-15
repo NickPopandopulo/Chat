@@ -20,4 +20,14 @@ public interface AuthService {
      * Get nickname
      */
     Optional<String> getNickByLoginAndPass(String login, String pass);
+
+    /**
+     * Get ID
+     */
+    Optional<String> getIDByLoginAndPass(String login, String pass);
+
+    /**
+     * Change nickname
+     */
+    void changeNick(int id, String newNickName);
 }
