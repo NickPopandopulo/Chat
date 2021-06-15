@@ -18,4 +18,6 @@ public class ChatConstants {
 
     public static final String SEND_TO_LIST = "/list";
 
+    public static final String CHANGE_NICK = "/change";
+
 }
