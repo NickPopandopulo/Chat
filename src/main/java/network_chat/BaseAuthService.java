@@ -1,5 +1,8 @@
 package network_chat;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import java.sql.*;
 import java.util.Optional;
 
@@ -15,6 +18,8 @@ public class BaseAuthService implements AuthService {
     private final static int GET_ID = 0;
     private final static int GET_NICK = 1;
 
+    private static final Logger LOGGER = LogManager.getLogger(BaseAuthService.class);
+
     @Override
     public void start() {
         try {
@@ -25,9 +30,10 @@ public class BaseAuthService implements AuthService {
             createTable();
             fillTable();
 
-            System.out.println("BaseAuthService started.");
+            LOGGER.info("BaseAuthService started.");
         } catch (ClassNotFoundException | SQLException e) {
             e.printStackTrace();
+            LOGGER.error(e);
         }
     }
 
@@ -66,9 +72,10 @@ public class BaseAuthService implements AuthService {
             stmt.execute("DROP TABLE Users;");
             stmt.close();
             connection.close();
-            System.out.println("BaseAuthService stopped.");
+            LOGGER.info("BaseAuthService stopped.");
         } catch (SQLException throwables) {
             throwables.printStackTrace();
+            LOGGER.error(throwables);
         }
     }
 
@@ -87,7 +94,7 @@ public class BaseAuthService implements AuthService {
      */
     private Optional<String> getDataByLoginAndPass(String login, String pass, int status) {
         try {
-            String selectQuery = "SELECT * FROM USERS WHERE Login = '" + login + "' AND Pass = '" + pass + "';";
+            String selectQuery = "SELECT * FROM USERS WHERE Login = '" + login + "' AND Password = '" + pass + "';";
             ResultSet rs = stmt.executeQuery(selectQuery);
             if (status == GET_NICK) {
                 return Optional.ofNullable(rs.getString("NickName"));
@@ -96,6 +103,7 @@ public class BaseAuthService implements AuthService {
             }
         } catch (SQLException throwables) {
             throwables.printStackTrace();
+            LOGGER.error(throwables);
         }
         return Optional.empty();
     }
@@ -103,11 +111,36 @@ public class BaseAuthService implements AuthService {
     @Override
     public synchronized void changeNick(int id, String newNickName) {
         try {
-            String updateQuery = "UPDATE Users SET NickName = '" + newNickName + "' WHERE UserID = " + id + ";";
-            stmt.executeUpdate(updateQuery);
+//            String updateQuery = "UPDATE Users SET NickName = '" + newNickName + "' WHERE UserID = " + id + ";";
+            String updateQuery = "UPDATE Users SET NickName = ? WHERE UserID = ?;";
+            PreparedStatement ps = connection.prepareStatement(updateQuery);
+            ps.setString(1, newNickName);
+            ps.setInt(2, id);
+            ps.addBatch();
+            ps.executeBatch();
+//            stmt.executeUpdate(updateQuery);
         } catch (SQLException throwables) {
             throwables.printStackTrace();
+            LOGGER.error(throwables);
         }
+    }
+
+    @Override
+    public synchronized boolean isNickBusyInDB(String nickName) {
+        String selectQuery = "SELECT * FROM USERS;";
+        try {
+            ResultSet rs = stmt.executeQuery(selectQuery);
+            while (rs.next()) {
+                if (rs.getString("NickName").equals(nickName)) {
+                    return true;
+                }
+            }
+        } catch (SQLException throwables) {
+            throwables.printStackTrace();
+            LOGGER.error(throwables);
+        }
+
+        return false;
     }
 
 }

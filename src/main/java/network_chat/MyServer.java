@@ -9,11 +9,15 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 public class MyServer {
 
     private AuthService authService;
     private List<ClientHandler> clients;
+
+    public static final Logger LOGGER = LogManager.getLogger(MyServer.class);
 
     public MyServer() {
         try (ServerSocket server = new ServerSocket(ChatConstants.PORT)) {
@@ -22,11 +26,12 @@ public class MyServer {
 
             ExecutorService executorService = Executors.newCachedThreadPool();
 
+            LOGGER.info("Server is started!");
             clients = new ArrayList<>();
             while (true) {
-                System.out.println("Wait for clients...");
+                LOGGER.info("Wait for clients...");
                 Socket socket = server.accept();
-                System.out.println(socket.getInetAddress() + " client is connected!");
+                LOGGER.info(socket.getInetAddress() + " client is connected!");
                 new ClientHandler(this, socket, executorService);
             }
         } catch (IOException e) {

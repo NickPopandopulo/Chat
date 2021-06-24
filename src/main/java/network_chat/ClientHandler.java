@@ -1,5 +1,8 @@
 package network_chat;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -21,6 +24,8 @@ public class ClientHandler {
     private String nick;
     private int id;
     private volatile boolean isAuthorized = false;
+    private static final Logger LOGGER = LogManager.getLogger(ClientHandler.class);
+    private AuthService authService;
     private ExecutorService executorService;
 
     public ClientHandler(MyServer server, Socket socket, ExecutorService executorService) {
@@ -31,6 +36,7 @@ public class ClientHandler {
             this.in = new DataInputStream(socket.getInputStream());
             this.out = new DataOutputStream(socket.getOutputStream());
             this.executorService = executorService;
+            authService = server.getAuthService();
 
             executorService.execute(() -> {
                 try {
@@ -67,6 +73,8 @@ public class ClientHandler {
                 if (nick.isPresent()) {
                     if (!server.isNickBusy(nick.get())) {
                         isAuthorized = true;
+                        sendMsg(ChatConstants.AUTH_SUCCESS + " " + nick.get());
+                        LOGGER.info("Successful authorization: " + nick.get());
                         this.nick = nick.get();
                         sendMsg(ChatConstants.AUTH_SUCCESS + " " + this.nick);
                         this.id = Integer.parseInt(id.get());
@@ -88,6 +96,7 @@ public class ClientHandler {
             out.writeUTF(message);
         } catch (IOException e) {
             e.printStackTrace();
+            LOGGER.error(e);
         }
     }
 
@@ -95,51 +104,64 @@ public class ClientHandler {
         while (true) {
             String messageFromClient = in.readUTF();
             System.out.println("[" + nick + "]: " + messageFromClient);
+
             if (messageFromClient.equals(ChatConstants.STOP_WORD)) {
-                out.writeUTF(ChatConstants.STOP_WORD);
+                LOGGER.info("Received stop-word from " + nick);
                 return;
+
             } else if (messageFromClient.startsWith(ChatConstants.CLIENTS_LIST)) {
+                LOGGER.info("Received request for an list of online users from " + nick);
                 server.broadcastClients(List.of(nick));
+
             } else if (messageFromClient.startsWith(ChatConstants.CHANGE_NICK)) { // смена nickname
                 String[] partsMsg = messageFromClient.split("\\s+");
+                LOGGER.info("Received request for nickname changing from " + nick);
+
                 // Если nick не занят
-                if (!server.isNickBusy(partsMsg[1])) {
-                    server.getAuthService().changeNick(id, partsMsg[1]);
+                if (!authService.isNickBusyInDB(partsMsg[1])) {
+                    authService.changeNick(id, partsMsg[1]);
                     server.broadcastMessage("User " + nick + " has changed nickname to " + partsMsg[1]);
+                    LOGGER.info("User " + nick + " has changed nickname to " + partsMsg[1]);
                     nick = partsMsg[1];
                     // Если nick занят
-                } else if (server.isNickBusy(partsMsg[1])) {
-                    sendMsg(ChatConstants.DIRECT + " " + nick +
-                            " Nickname " + partsMsg[1] + " is already in use.");
+                } else if (authService.isNickBusyInDB(partsMsg[1])) {
+                    sendMsg("Nickname " + partsMsg[1] + " is already in use.");
+                    LOGGER.info("Nickname changing for " + nick + " is unavailable. " +
+                            "Nickname " + partsMsg[1] + " is already in use.");
                 }
             } else {
                 server.broadcastMessage(messageFromClient, nick);
+                LOGGER.info("Received a message from " + nick);
             }
         }
     }
 
     public void closeConnection() {
         server.broadcastMessage(nick + " exited the chat.");
+        LOGGER.info(nick + " exited the chat.");
         server.unsubscribe(this);
         try {
             in.close();
         } catch (IOException e) {
             e.printStackTrace();
+            LOGGER.error(e);
         }
         try {
             out.close();
         } catch (IOException e) {
             e.printStackTrace();
+            LOGGER.error(e);
         }
         try {
             socket.close();
         } catch (IOException e) {
             e.printStackTrace();
+            LOGGER.error(e);
         }
     }
 
     private void timeForAuth() {
-        executorService.execute(() -> {
+        new Thread(() -> {
             try {
                 long startTime = System.currentTimeMillis();
                 while (true) {
@@ -155,8 +177,9 @@ public class ClientHandler {
                 }
             } catch (InterruptedException | IOException e) {
                 e.printStackTrace();
+                LOGGER.error(e);
             }
-        });
+        }).start();
     }
 }
 
