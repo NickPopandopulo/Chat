@@ -1,5 +1,6 @@
 package network_chat;
 
+import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.sql.*;
@@ -17,7 +18,7 @@ public class BaseAuthService implements AuthService {
     private final static int GET_ID = 0;
     private final static int GET_NICK = 1;
 
-    private static final Logger LOGGER = MyServer.LOGGER;
+    private static final Logger LOGGER = LogManager.getLogger(BaseAuthService.class);
 
     @Override
     public void start() {

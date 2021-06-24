@@ -1,5 +1,6 @@
 package network_chat;
 
+import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.DataInputStream;
@@ -22,7 +23,7 @@ public class ClientHandler {
     private String nick;
     private int id;
     private volatile boolean timeIsOut = true;
-    private static final Logger LOGGER = MyServer.LOGGER;
+    private static final Logger LOGGER = LogManager.getLogger(ClientHandler.class);
     private AuthService authService;
 
     public ClientHandler(MyServer server, Socket socket) {
